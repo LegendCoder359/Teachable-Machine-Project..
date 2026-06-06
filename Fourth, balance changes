@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>⚡ GESTURE FIGHTER II: ARCADE EDITION ⚡</title>
+    <!-- Importing a retro pixel font -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-green: #39ff14;
+            --neon-red: #ff0055;
+            --neon-blue: #00f0ff;
+            --neon-yellow: #ffea00;
+        }
+
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #0b0c10;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* Arcade Cabinet Frame Structure */
+        .arcade-cabinet {
+            background: linear-gradient(180deg, #1f1f2e 0%, #0f0f15 100%);
+            border: 6px solid #4d4d73;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.3), inset 0 0 20px rgba(0,0,0,0.8);
+            border-radius: 20px;
+            padding: 25px;
+            width: 100%;
+            max-width: 960px;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* Retro CRT Scanline Overlay Effect */
+        .arcade-cabinet::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 5;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+            border-radius: 14px;
+        }
+
+        h1.marquee {
+            text-align: center;
+            font-size: 24px;
+            margin: 0 0 20px 0;
+            color: #fff;
+            text-shadow: 0 0 10px var(--neon-red), 0 0 20px var(--neon-red);
+            letter-spacing: 2px;
+            animation: flicker 2s infinite alternate;
+        }
+
+        .insert-coin-zone {
+            background: #15161e;
+            border: 4px dashed var(--neon-blue);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+
+        .insert-coin-zone label {
+            color: var(--neon-yellow);
+            font-size: 12px;
+            display: block;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        input[type="file"] {
+            font-family: 'Press Start 2P', monospace;
+            background: #222;
+            color: #fff;
+            border: 2px solid #555;
+            padding: 8px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        /* HUD & Timer Board */
+        .stage-timer-board {
+            text-align: center;
+            font-size: 14px;
+            color: var(--neon-yellow);
+            text-shadow: 0 0 8px rgba(255, 234, 0, 0.5);
+            margin-bottom: 25px;
+            min-height: 24px;
+        }
+
+        /* Dual Fight Grid Layout */
+        .vs-matrix {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .fighter-deck {
+            background: #12131a;
+            border: 4px solid #333;
+            border-radius: 10px;
+            padding: 20px 15px;
+            width: 280px;
+            box-sizing: border-box;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        .fighter-deck.p1-side { border-color: var(--neon-green); box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); }
+        .fighter-deck.p2-side { border-color: var(--neon-red); box-shadow: 0 0 15px rgba(255, 0, 85, 0.2); }
+
+        .fighter-title {
+            font-size: 14px;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+        .p1-side .fighter-title { color: var(--neon-green); }
+        .p2-side .fighter-title { color: var(--neon-red); }
+
+        /* Retro Lifebars */
+        .lifebar-frame {
+            background: #2c2d35;
+            border: 3px solid #fff;
+            height: 24px;
+            padding: 2px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .lifebar-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.2s cubic-bezier(0.1, 0.8, 0.3, 1);
+        }
+        .p1-side .lifebar-fill { background-color: var(--neon-green); }
+        .p2-side .lifebar-fill { background-color: var(--neon-red); }
+
+        .hp-numerical {
+            font-size: 9px;
+            color: #bbb;
+            margin-bottom: 15px;
+        }
+
+        .arcade-instructions {
+            font-size: 8px;
+            line-height: 1.8;
+            color: #8a8d9a;
+            text-align: left;
+            border-top: 2px dashed #333;
+            padding-top: 12px;
+            margin-top: 15px;
+        }
+
+        .intent-flash {
+            font-size: 10px;
+            color: #fff;
+            background: #2a000c;
+            padding: 8px 4px;
+            border: 2px dashed var(--neon-red);
+            border-radius: 4px;
+            margin-top: 15px;
+            animation: pulse 1s infinite alternate;
+        }
+
+        /* Center Dashboard controls */
+        .center-dash {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 320px;
+            box-sizing: border-box;
+        }
+
+        #live-stance {
+            font-size: 10px;
+            background: var(--neon-blue);
+            color: #000;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #camera-feed canvas {
+            border: 4px solid #fff;
+            background: #000;
+            box-shadow: 0 0 15px rgba(255,255,255,0.1);
+            display: block;
+            width: 240px !important;
+            height: 240px !important;
+        }
+
+        /* Scrolling Ticker Combat Log */
+        .arcade-log-deck {
+            background: #050508;
+            border: 3px solid #444;
+            padding: 10px;
+            width: 100%;
+            height: 110px;
+            overflow-y: auto;
+            box-sizing: border-box;
+            font-size: 8px;
+            line-height: 1.6;
+            color: #a0a5b5;
+            margin-top: 20px;
+        }
+        .log-row {
+            margin-bottom: 8px;
+            border-bottom: 1px solid #111;
+            padding-bottom: 4px;
+        }
+
+        /* Flash Screen Animations */
+        @keyframes flicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% { text-shadow: 0 0 10px var(--neon-red), 0 0 20px var(--neon-red); }
+            20%, 24%, 55% { text-shadow: none; }
+        }
+        @keyframes pulse {
+            0% { opacity: 0.7; transform: scale(0.98); }
+            100% { opacity: 1; transform: scale(1.02); }
+        }
+
+        /* Dynamic Fight FX Toggles */
+        .damaged-fx { animation: shake 0.2s linear 2; border-color: #fff !important; }
+        .healed-fx { border-color: var(--neon-blue) !important; }
+        @keyframes shake {
+            0% { transform: translate(3px, 1px); }
+            50% { transform: translate(-3px, -1px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        /* K.O. Screen Overlay Layout */
+        #game-over-screen {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+        #ko-banner {
+            font-size: 40px;
+            color: var(--neon-red);
+            text-shadow: 0 0 20px var(--neon-red);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        #continue-btn {
+            font-family: 'Press Start 2P', monospace;
+            padding: 15px 30px;
+            font-size: 14px;
+            background: var(--neon-yellow);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 15px var(--neon-yellow);
+        }
+        #continue-btn:hover { background: #fff; box-shadow: 0 0 20px #fff; }
+    </style>
+</head>
+<body>
+
+    <div class="arcade-cabinet">
+        <h1 class="marquee">GESTURE FIGHTER II</h1>
+        
+        <!-- ROM Uploader (Insert Coin Configuration) -->
+        <div class="insert-coin-zone" id="coin-box">
+            <label>INSERT MODEL ROM DISKETTE TO LAUNCH CABINET<br>(Upload your Teachable Machine exported .zip model file)</label>
+            <input type="file" id="model-zip" accept=".zip" />
+        </div>
+
+        <!-- HUD Turn Ticker -->
+        <div class="stage-timer-board" id="hud-ticker">CABINET INACTIVE</div>
+
+        <!-- Combat Viewport Matrix -->
+        <div class="vs-matrix">
+            
+            <!-- Player One Interface Card -->
+            <div class="fighter-deck p1-side" id="p1-card">
+                <div class="fighter-title">1P HERO</div>
+                <div class="lifebar-frame">
+                    <div id="p1-lifebar" class="lifebar-fill"></div>
+                </div>
+                <div class="hp-numerical" id="p1-hp-label">HP: 100/100</div>
+                
+                <div class="arcade-instructions">
+                    🥊 COMMAND LIST:<br><br>
+                    👍 THUMBS UP  - ATTACK [15 DMG]<br>
+                    👎 THUMBS DOWN- BLOCK  [-50% DMG]<br>
+                    👉 SIDEWAYS   - HEAL   [+14 HP]
+                </div>
+            </div>
+
+            <!-- Central Tracking Console Column -->
+            <div class="center-dash">
+                <div id="live-stance">STANCE: LOCKING IN</div>
+                <div id="camera-feed"></div>
+                <div class="arcade-log-deck" id="feed-ticker-logs"></div>
+            </div>
+
+            <!-- CPU Opponent Interface Card -->
+            <div class="fighter-deck p2-side" id="p2-card">
+                <div class="fighter-title">CPU BOSS</div>
+                <div class="lifebar-frame">
+                    <div id="p2-lifebar" class="lifebar-fill"></div>
+                </div>
+                <div class="hp-numerical" id="p2-hp-label">HP: 120/120</div>
+                
+                <div class="intent-flash" id="cpu-radar">TARGET LOCKING...</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Retro Game Over / Victory Overlay Screen -->
+    <div id="game-over-screen">
+        <div id="ko-banner">K.O.</div>
+        <button id="continue-btn" onclick="reviveArcadeMatch()">PRESS START TO CONTINUE</button>
+    </div>
+
+    <!-- Neural & Compression Engine Framework Injections -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        let model, webcam, maxPredictions;
+        let activeGesture = "None";
+        let loopRunning = false;
+
+        // Balance Settings
+        let p1HP = 100, maxP1HP = 100;
+        let cpuHP = 120, maxCpuHP = 120;
+        let cpuNextMove = "Attack";
+
+        // Timing Systems
+        let frameCountdown = 3;
+        let clockThread;
+
+        const zipFileSelector = document.getElementById("model-zip");
+        const tickerHUD = document.getElementById("hud-ticker");
+        const stanceHUD = document.getElementById("live-stance");
+        const matchLogs = document.getElementById("feed-ticker-logs");
+
+        // Processing model binary files extracted locally out of the .zip payload
+        zipFileSelector.addEventListener("change", async (e) => {
+            const uploadedFile = e.target.files[0];
+            if (!uploadedFile) return;
+
+            tickerHUD.innerText = "PARSING ROM DATA...";
+            const archiveDecompressor = new JSZip();
+
+            try {
+                const unzippedContents = await archiveDecompressor.loadAsync(uploadedFile);
+                let modelFile, metadataFile, weightsFile;
+
+                for (const path in unzippedContents.files) {
+                    const node = unzippedContents.files[path];
+                    if (node.dir) continue;
+                    const blob = await node.async("blob");
+
+                    if (path.endsWith("model.json")) {
+                        modelFile = new File([blob], "model.json", { type: "application/json" });
+                    } else if (path.endsWith("metadata.json")) {
+                        metadataFile = new File([blob], "metadata.json", { type: "application/json" });
+                    } else if (path.endsWith("weights.bin")) {
+                        weightsFile = new File([blob], "weights.bin", { type: "application/octet-stream" });
+                    }
+                }
+
+                if (!modelFile || !metadataFile || !weightsFile) {
+                    tickerHUD.innerText = "ERROR: ROM CONFIG INVALID";
+                    return;
+                }
+
+                model = await tmImage.loadFromFiles(modelFile, weightsFile, metadataFile);
+                maxPredictions = model.getTotalClasses();
+
+                document.getElementById("coin-box").style.display = "none";
+                tickerHUD.innerText = "BOOTING HARDWARE CAMERA...";
+
+                await deployArcadeCamera();
+                reviveArcadeMatch();
+
+            } catch (error) {
+                tickerHUD.innerText = "BOOT FAULT. DISK ERROR.";
+                console.error(error);
+            }
+        });
+
+        async function deployArcadeCamera() {
+            webcam = new tmImage.Webcam(240, 240, true);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(arcadeFramePulse);
+            document.getElementById("camera-feed").appendChild(webcam.canvas);
+        }
+
+        async function arcadeFramePulse() {
+            webcam.update();
+            await parseLiveInputs();
+            window.requestAnimationFrame(arcadeFramePulse);
+        }
+
+        // Live classification analysis mapping class outputs into actionable directives
+        async function parseLiveInputs() {
+            if (!model) return;
+            const scoringMatrix = await model.predict(webcam.canvas);
+            
+            let confidenceCap = 0;
+            let dominantTrack = "None";
+
+            for (let i = 0; i < maxPredictions; i++) {
+                if (scoringMatrix[i].probability > confidenceCap) {
+                    confidenceCap = scoringMatrix[i].probability;
+                    dominantTrack = scoringMatrix[i].className;
+                }
+            }
+
+            let normalizedStr = dominantTrack.toLowerCase();
+            if (normalizedStr.includes("up") || normalizedStr.includes("attack")) {
+                activeGesture = "ATTACK";
+            } else if (normalizedStr.includes("down") || normalizedStr.includes("defend") || normalizedStr.includes("block")) {
+                activeGesture = "BLOCK";
+            } else if (normalizedStr.includes("side") || normalizedStr.includes("heal")) {
+                activeGesture = "HEAL";
+            } else {
+                activeGesture = "NEUTRAL";
+            }
+
+            stanceHUD.innerText = `YOUR INPUT: ${activeGesture}`;
+        }
+
+        // Action Frame Countdown Loop (Turn engine ticks)
+        function launchActionClock() {
+            clearInterval(clockThread);
+            refreshCpuIntention();
+            frameCountdown = 3;
+            tickerHUD.innerText = `ROUND TIME: ${frameCountdown}`;
+
+            clockThread = setInterval(() => {
+                if (!loopRunning) return;
+                frameCountdown--;
+
+                if (frameCountdown <= 0) {
+                    resolveBattleCalculations();
+                    frameCountdown = 3;
+                }
+                tickerHUD.innerText = `ROUND TIME: ${frameCountdown}`;
+            }, 1000);
+        }
+
+        // Randomized Adaptive Boss Decision Patterns
+        function refreshCpuIntention() {
+            const tacticsRegistry = ["Attack", "Attack", "Defend", "Heal"];
+            if (cpuHP < 50) {
+                tacticsRegistry.push("Heal", "Defend"); // Increases survival strategy frequency when threatened
+            }
+            cpuNextMove = tacticsRegistry[Math.floor(Math.random() * tacticsRegistry.length)];
+            document.getElementById("cpu-radar").innerText = `INTENT: NEXT MOVE -> ${cpuNextMove.toUpperCase()}`;
+        }
+
+        // Main Turn Resolver applying action offsets and rendering damage/healing visual prompts
+        function resolveBattleCalculations() {
+            let heroInput = activeGesture;
+            
+            let p1Strike = 15;
+            let p1Recovery = 14; // Slightly lower than CPU Strike (16)
+            
+            let cpuStrike = 16;
+            let cpuRecovery = 10;
+
+            const p1Card = document.getElementById("p1-card");
+            const p2Card = document.getElementById("p2-card");
+
+            // Clear any lingering CSS animation visual indicators
+            p1Card.classList.remove("damaged-fx", "healed-fx");
+            p2Card.classList.remove("damaged-fx", "healed-fx");
+
+            appendLogEntry(`--- TURN RESOLVED ---`);
+            appendLogEntry(`YOU: ${heroInput} | CPU: ${cpuNextMove.toUpperCase()}`);
+
+            // Compute Hero's Turn Outputs
+            if (heroInput === "ATTACK") {
+                // If CPU blocks, reduce player damage by a hardcoded 50%
+                let finalDamage = (cpuNextMove === "Defend") ? Math.floor(p1Strike * 0.5) : p1Strike;
+                cpuHP -= finalDamage;
+                appendLogEntry(`HITS CPU FOR ${finalDamage} DMG!${cpuNextMove === "Defend" ? ' (BLOCKED 50%)' : ''}`);
+                if (finalDamage > 0) p2Card.classList.add("damaged-fx");
+            } else if (heroInput === "HEAL") {
+                p1HP = Math.min(maxP1HP, p1HP + p1Recovery);
+                appendLogEntry(`HERO RECOVERS +${p1Recovery} HP.`);
+                p1Card.classList.add("healed-fx");
+            } else if (heroInput === "NEUTRAL") {
+                appendLogEntry(`INPUT STAGGER! MISSED TURN.`);
+            }
+
+            // Compute CPU's Turn Outputs
+            if (cpuNextMove === "Attack") {
+                // If Hero blocks, reduce enemy damage by exactly 50%
+                let finalDamage = (heroInput === "BLOCK") ? Math.floor(cpuStrike * 0.5) : cpuStrike;
+                p1HP -= finalDamage;
+                appendLogEntry(`CPU SMASHES YOU FOR ${finalDamage} DMG!${heroInput === "BLOCK" ? ' (BLOCKED 50%)' : ''}`);
+                if (finalDamage > 0) p1Card.classList.add("damaged-fx");
+            } else if (cpuNextMove === "Heal") {
+                cpuHP = Math.min(maxCpuHP, cpuHP + cpuRecovery);
+                appendLogEntry(`CPU RECOVERS +${cpuRecovery} HP.`);
+                p2Card.classList.add("healed-fx");
+            }
+
+            if (p1HP < 0) p1HP = 0;
+            if (cpuHP < 0) cpuHP = 0;
+
+            refreshVitalsHUD();
+            verifyMatchOutcomes();
+
+            if (loopRunning) {
+                refreshCpuIntention();
+            }
+        }
+
+        function refreshVitalsHUD() {
+            let p1Ratio = (p1HP / maxP1HP) * 100;
+            let cpuRatio = (cpuHP / maxCpuHP) * 100;
+
+            document.getElementById("p1-lifebar").style.width = `${p1Ratio}%`;
+            document.getElementById("p1-hp-label").innerText = `HP: ${p1HP}/${maxP1HP}`;
+
+            document.getElementById("p2-lifebar").style.width = `${cpuRatio}%`;
+            document.getElementById("p2-hp-label").innerText = `HP: ${cpuHP}/${maxCpuHP}`;
+        }
+
+        function appendLogEntry(msgStr) {
+            const entryRow = document.createElement("div");
+            entryRow.className = "log-row";
+            entryRow.innerText = `> ${msgStr}`;
+            matchLogs.appendChild(entryRow);
+            matchLogs.scrollTop = matchLogs.scrollHeight;
+        }
+
+        function verifyMatchOutcomes() {
+            if (p1HP <= 0 && cpuHP <= 0) {
+                terminateSession("MUTUAL DRAW", "#ffea00");
+            } else if (cpuHP <= 0) {
+                terminateSession("VICTORY! P1 WINS", "#39ff14");
+            } else if (p1HP <= 0) {
+                terminateSession("GAME OVER", "#ff0055");
+            }
+        }
+
+        function terminateSession(bannerText, neonColor) {
+            loopRunning = false;
+            clearInterval(clockThread);
+            
+            const pane = document.getElementById("game-over-screen");
+            const head = document.getElementById("ko-banner");
+            
+            head.innerText = bannerText;
+            head.style.color = neonColor;
+            head.style.textShadow = `0 0 20px ${neonColor}`;
+            pane.style.display = "flex";
+        }
+
+        function reviveArcadeMatch() {
+            p1HP = maxP1HP;
+            cpuHP = maxCpuHP;
+            matchLogs.innerHTML = "";
+            document.getElementById("game-over-screen").style.display = "none";
+            
+            // Clean anim styling artifacts
+            document.getElementById("p1-card").className = "fighter-deck p1-side";
+            document.getElementById("p2-card").className = "fighter-deck p2-side";
+
+            loopRunning = true;
+            refreshVitalsHUD();
+            appendLogEntry("READY... FIGHT!");
+            launchActionClock();
+        }
+    </script>
+</body>
+</html>
