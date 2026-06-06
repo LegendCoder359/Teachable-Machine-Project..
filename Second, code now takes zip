@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Teachable Machine - Local ZIP Model Loader</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #webcam-container canvas { border: 2px solid #333; border-radius: 8px; margin-top: 10px; }
+        #label-container { margin-top: 15px; font-size: 1.2rem; font-weight: bold; }
+        .upload-section { background: #f4f4f9; padding: 15px; border-radius: 8px; display: inline-block; border: 1px dashed #bbb; }
+    </style>
+</head>
+<body>
+
+    <h2>Teachable Machine Image Model (Load from ZIP)</h2>
+    
+    <div class="upload-section">
+        <label href="#" style="font-weight: bold; display: block; margin-bottom: 5px;">Upload your model .zip file:</label>
+        <input type="file" id="model-zip" accept=".zip" />
+        <span id="status" style="margin-left: 10px; color: #555;">Waiting for model zip...</span>
+    </div>
+
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script type="text/javascript">
+        let model, webcam, labelContainer, maxPredictions;
+
+        const zipInput = document.getElementById("model-zip");
+        const statusText = document.getElementById("status");
+
+        // Event listener to catch the uploaded model zip file
+        zipInput.addEventListener("change", async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            statusText.innerText = "Extracting model files...";
+            const jszip = new JSZip();
+
+            try {
+                // Decompress the zip file
+                const zip = await jszip.loadAsync(file);
+
+                let modelFile, metadataFile, weightsFile;
+
+                // Look for the specific files Teachable Machine needs
+                for (const relativePath in zip.files) {
+                    const entry = zip.files[relativePath];
+                    if (entry.dir) continue;
+
+                    if (relativePath.endsWith("model.json")) {
+                        // Extract as a standard File blob object
+                        const blob = await entry.async("blob");
+                        modelFile = new File([blob], "model.json", { type: "application/json" });
+                    } else if (relativePath.endsWith("metadata.json")) {
+                        const blob = await entry.async("blob");
+                        metadataFile = new File([blob], "metadata.json", { type: "application/json" });
+                    } else if (relativePath.endsWith("weights.bin")) {
+                        const blob = await entry.async("blob");
+                        weightsFile = new File([blob], "weights.bin", { type: "application/octet-stream" });
+                    }
+                }
+
+                // Verify all required model parts are present inside the zip file
+                if (!modelFile || !metadataFile || !weightsFile) {
+                    statusText.innerText = "Error: ZIP missing model.json, metadata.json, or weights.bin.";
+                    return;
+                }
+
+                statusText.innerText = "Loading model into TensorFlow.js...";
+
+                // Use Teachable Machine's local file loader instead of a URL loader
+                model = await tmImage.loadFromFiles(modelFile, weightsFile, metadataFile);
+                maxPredictions = model.getTotalClasses();
+
+                statusText.innerText = "Model Ready! Starting Webcam...";
+                zipInput.disabled = true; // Lock input once loaded successfully
+
+                // Fire up the webcam stream
+                await setupWebcam();
+
+            } catch (err) {
+                statusText.innerText = "Failed to process the zip file.";
+                console.error(err);
+            }
+        });
+
+        // Setup and launch webcam streaming
+        async function setupWebcam() {
+            const flip = true; 
+            webcam = new tmImage.Webcam(200, 200, flip); 
+            await webcam.setup(); 
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            // Append webcam canvas to DOM
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            // Generate label wrappers dynamically matching your classes (Attack, Block, Heal, etc.)
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = ""; // Clear placeholder text
+            for (let i = 0; i < maxPredictions; i++) { 
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop() {
+            webcam.update(); // Fetch newest webcam frame
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        // Run the current webcam frame through your loaded custom zip model
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+        }
+    </script>
+</body>
+</html>
