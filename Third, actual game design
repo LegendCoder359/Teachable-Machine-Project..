@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gesture Battle Arena</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e24;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { margin-bottom: 5px; color: #ff4757; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
+        .upload-section {
+            background: #2f3542;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 2px dashed #57606f;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        input[type="file"] { margin-top: 10px; }
+
+        /* Battle Station Layout */
+        .battle-arena {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            align-items: flex-start;
+            margin-top: 10px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .combatant-card {
+            background: #2f3542;
+            border-radius: 12px;
+            padding: 20px;
+            width: 250px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 3px solid #747d8c;
+        }
+        .combatant-card.player { border-color: #2ed573; }
+        .combatant-card.enemy { border-color: #ff4757; }
+
+        .hp-bar-container {
+            background: #747d8c;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .hp-bar {
+            height: 100%;
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        .player .hp-bar { background: #2ed573; }
+        .enemy .hp-bar { background: #ff4757; }
+
+        /* Center Control Column */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 300px;
+        }
+        #webcam-container canvas {
+            border: 4px solid #57606f;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        /* Timer and Log styles */
+        #timer-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 15px 0;
+            color: #ffa502;
+            text-align: center;
+        }
+        #current-gesture {
+            font-size: 1.2rem;
+            background: #ffa502;
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            min-height: 28px;
+        }
+        #combat-log {
+            background: #11141a;
+            border-radius: 8px;
+            padding: 10px;
+            width: 100%;
+            height: 120px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            border: 1px solid #57606f;
+            color: #ced6e0;
+        }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #222; padding-bottom: 2px;}
+        
+        /* Game Over Screen Overlay */
+        #overlay {
+            display: none;
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 10;
+        }
+        #overlay h2 { font-size: 3rem; margin-bottom: 20px; }
+        #restart-btn {
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #restart-btn:hover { background: #ff6b81; }
+    </style>
+</head>
+<body>
+
+    <h1>Gesture Battle Arena</h1>
+    <div id="timer-display">Upload model zip to begin...</div>
+
+    <div class="upload-section" id="upload-box">
+        <label style="font-weight: bold; display: block;">Load Teachable Machine Model ZIP:</label>
+        <input type="file" id="model-zip" accept=".zip" />
+    </div>
+
+    <div class="battle-arena">
+        <!-- Player Card -->
+        <div class="combatant-card player">
+            <h2>Hero (You)</h2>
+            <div class="hp-bar-container">
+                <div id="player-hp-bar" class="hp-bar"></div>
+            </div>
+            <div id="player-hp-text">HP: 100 / 100</div>
+            <p style="margin-top: 20px; font-size: 0.85rem; color: #a4b0be;">
+                👍 Attack (Deals 15)<br>
+                👎 Defend (Blocks 12)<br>
+                👉 Heal (Restores 12)
+            </p>
+        </div>
+
+        <!-- Center Camera & Log Grid -->
+        <div class="controls">
+            <div id="current-gesture">Waiting...</div>
+            <div id="webcam-container"></div>
+            <h4 style="margin: 15px 0 5px 0; align-self: flex-start;">Battle Log:</h4>
+            <div id="combat-log"></div>
+        </div>
+
+        <!-- Enemy Card -->
+        <div class="combatant-card enemy">
+            <h2>Dark Overlord</h2>
+            <div class="hp-bar-container">
+                <div id="enemy-hp-bar" class="hp-bar"></div>
+            </div>
+            <div id="enemy-hp-text">HP: 120 / 120</div>
+            <div id="enemy-intent" style="margin-top: 20px; color: #ff6b81; font-weight: bold;">Intent: Checking vision...</div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="overlay">
+        <h2 id="win-lose-text">You Win!</h2>
+        <button id="restart-btn" onclick="resetGame()">Battle Again</button>
+    </div>
+
+    <!-- Framework Imports -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        let model, webcam, maxPredictions;
+        let activeGesture = "None";
+        let gameActive = false;
+
+        // Stats Configuration (Balanced for challenge)
+        let playerHP = 100, maxPlayerHP = 100;
+        let enemyHP = 120, maxEnemyHP = 120; // Enemy has slightly higher base health
+        let enemyIntent = "Attack"; // Tracks what enemy will do this turn
+
+        // Turn Timers
+        let roundTimeLeft = 3; 
+        let gameInterval;
+
+        const zipInput = document.getElementById("model-zip");
+        const timerDisplay = document.getElementById("timer-display");
+        const currentGestureDisplay = document.getElementById("current-gesture");
+        const logContainer = document.getElementById("combat-log");
+
+        // --- Model Initialization via ZIP ---
+        zipInput.addEventListener("change", async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            timerDisplay.innerText = "Extracting custom gesture profile...";
+            const jszip = new JSZip();
+
+            try {
+                const zip = await jszip.loadAsync(file);
+                let modelFile, metadataFile, weightsFile;
+
+                for (const relativePath in zip.files) {
+                    const entry = zip.files[relativePath];
+                    if (entry.dir) continue;
+                    const blob = await entry.async("blob");
+
+                    if (relativePath.endsWith("model.json")) {
+                        modelFile = new File([blob], "model.json", { type: "application/json" });
+                    } else if (relativePath.endsWith("metadata.json")) {
+                        metadataFile = new File([blob], "metadata.json", { type: "application/json" });
+                    } else if (relativePath.endsWith("weights.bin")) {
+                        weightsFile = new File([blob], "weights.bin", { type: "application/octet-stream" });
+                    }
+                }
+
+                if (!modelFile || !metadataFile || !weightsFile) {
+                    timerDisplay.innerText = "Error: Invalid Teachable Machine Zip structure.";
+                    return;
+                }
+
+                model = await tmImage.loadFromFiles(modelFile, weightsFile, metadataFile);
+                maxPredictions = model.getTotalClasses();
+
+                document.getElementById("upload-box").style.display = "none";
+                timerDisplay.innerText = "Setting up hardware camera...";
+
+                await setupWebcam();
+                resetGame();
+
+            } catch (err) {
+                timerDisplay.innerText = "Failed to load assets from zip.";
+                console.error(err);
+            }
+        });
+
+        async function setupWebcam() {
+            webcam = new tmImage.Webcam(240, 240, true); 
+            await webcam.setup(); 
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+        }
+
+        async function loop() {
+            webcam.update(); 
+            await predictGesture();
+            window.requestAnimationFrame(loop);
+        }
+
+        // --- Gesture Interpret Engine ---
+        async function predictGesture() {
+            if (!model) return;
+            const prediction = await model.predict(webcam.canvas);
+            
+            // Find highest accuracy prediction
+            let highestProb = 0;
+            let bestClass = "None";
+
+            for (let i = 0; i < maxPredictions; i++) {
+                if (prediction[i].probability > highestProb) {
+                    highestProb = prediction[i].probability;
+                    bestClass = prediction[i].className;
+                }
+            }
+
+            // Standardize class names safely based on standard inputs
+            let detected = bestClass.toLowerCase();
+            if (detected.includes("up") || detected.includes("attack")) {
+                activeGesture = "Attack";
+            } else if (detected.includes("down") || detected.includes("defend") || detected.includes("block")) {
+                activeGesture = "Defend";
+            } else if (detected.includes("side") || detected.includes("heal")) {
+                activeGesture = "Heal";
+            } else {
+                activeGesture = "Idle/Neutral";
+            }
+
+            currentGestureDisplay.innerText = `Your Stance: ${activeGesture}`;
+        }
+
+        // --- Battle Engine Mechanics ---
+        function startGameTimer() {
+            clearInterval(gameInterval);
+            rollEnemyIntent();
+            roundTimeLeft = 3;
+            timerDisplay.innerText = `⏱️ LOCK IN GESTURE: ${roundTimeLeft}s`;
+
+            gameInterval = setInterval(() => {
+                if (!gameActive) return;
+                roundTimeLeft--;
+
+                if (roundTimeLeft <= 0) {
+                    executeCombatRound();
+                    roundTimeLeft = 3; // Reset clock
+                }
+                timerDisplay.innerText = `⏱️ LOCK IN GESTURE: ${roundTimeLeft}s`;
+            }, 1000);
+        }
+
+        // The Enemy AI engine (Smart Randomization)
+        function rollEnemyIntent() {
+            const choices = ["Attack", "Attack", "Defend", "Heal"];
+            // If enemy health drops low, increase probability to defend or heal safely
+            if (enemyHP < 40) {
+                choices.push("Heal", "Defend");
+            }
+            enemyIntent = choices[Math.floor(Math.random() * choices.length)];
+            document.getElementById("enemy-intent").innerText = `Intent: Preparing to ${enemyIntent.toUpperCase()}`;
+        }
+
+        function executeCombatRound() {
+            let playerAction = activeGesture;
+            let playerDmg = 15;
+            let playerBlock = 0;
+            let playerHeal = 12;
+
+            let enemyDmg = 16;  // Enemy hits slightly harder
+            let enemyBlock = 0;
+            let enemyHeal = 10;
+
+            addLogEntry(`⚔️ **ROUND RESOLUTION** ⚔️`);
+            addLogEntry(`You chose: **${playerAction}** | Enemy chose: **${enemyIntent}**`);
+
+            // Apply defense mitigations first
+            if (playerAction === "Defend") playerBlock = 12;
+            if (enemyIntent === "Defend") enemyBlock = 12;
+
+            // 1. Resolve Actions: Player
+            if (playerAction === "Attack") {
+                let actualDmg = Math.max(0, playerDmg - enemyBlock);
+                enemyHP -= actualDmg;
+                addLogEntry(`💥 You slashed Enemy for ${actualDmg} dmg! ${enemyBlock > 0 ? '(Enemy Blocked ' + enemyBlock + ')' : ''}`);
+            } else if (playerAction === "Heal") {
+                playerHP = Math.min(maxPlayerHP, playerHP + playerHeal);
+                addLogEntry(`💚 You cast restoration and recovered +${playerHeal} HP.`);
+            } else if (playerAction === "Idle/Neutral") {
+                addLogEntry(`⚠️ You staggered! (No valid gesture tracked).`);
+            }
+
+            // 2. Resolve Actions: Enemy
+            if (enemyIntent === "Attack") {
+                let actualDmg = Math.max(0, enemyDmg - playerBlock);
+                playerHP -= actualDmg;
+                addLogEntry(`🩸 Enemy smashed you for ${actualDmg} dmg! ${playerBlock > 0 ? '(You Blocked ' + playerBlock + ')' : ''}`);
+            } else if (enemyIntent === "Heal") {
+                enemyHP = Math.min(maxEnemyHP, enemyHP + enemyHeal);
+                addLogEntry(`🔮 Enemy drank an elixir and recovered +${enemyHeal} HP.`);
+            }
+
+            // Keep track of floor values
+            if (playerHP < 0) playerHP = 0;
+            if (enemyHP < 0) enemyHP = 0;
+
+            updateUIBars();
+            checkWinConditions();
+
+            if (gameActive) {
+                rollEnemyIntent(); // Queue next enemy response
+            }
+        }
+
+        function updateUIBars() {
+            // Percent calculations
+            let pPct = (playerHP / maxPlayerHP) * 100;
+            let ePct = (enemyHP / maxEnemyHP) * 100;
+
+            document.getElementById("player-hp-bar").style.width = `${pPct}%`;
+            document.getElementById("player-hp-text").innerText = `HP: ${playerHP} / ${maxPlayerHP}`;
+
+            document.getElementById("enemy-hp-bar").style.width = `${ePct}%`;
+            document.getElementById("enemy-hp-text").innerText = `HP: ${enemyHP} / ${maxEnemyHP}`;
+        }
+
+        function addLogEntry(text) {
+            const entry = document.createElement("div");
+            entry.className = "log-entry";
+            entry.innerHTML = text;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight; // Auto-scrolls
+        }
+
+        function checkWinConditions() {
+            if (playerHP <= 0 && enemyHP <= 0) {
+                endGame("MUTUAL DESTRUCTION!", "#ffa502");
+            } else if (enemyHP <= 0) {
+                endGame("VICTORY! OVERLORD DEFEATED", "#2ed573");
+            } else if (playerHP <= 0) {
+                endGame("DEFEAT! YOU PERISHED", "#ff4757");
+            }
+        }
+
+        function endGame(msg, color) {
+            gameActive = false;
+            clearInterval(gameInterval);
+            const overlay = document.getElementById("overlay");
+            const txt = document.getElementById("win-lose-text");
+            txt.innerText = msg;
+            txt.style.color = color;
+            overlay.style.display = "flex";
+        }
+
+        function resetGame() {
+            playerHP = maxPlayerHP;
+            enemyHP = maxEnemyHP;
+            logContainer.innerHTML = "";
+            document.getElementById("overlay").style.display = "none";
+            gameActive = true;
+            
+            updateUIBars();
+            addLogEntry("🏟️ Entering the arena. Game started!");
+            startGameTimer();
+        }
+    </script>
+</body>
+</html>
